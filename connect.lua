@@ -6,24 +6,41 @@ local function getGlobalTable()
 	return typeof(getfenv().getgenv) == "function" and typeof(getfenv().getgenv()) == "table" and getfenv().getgenv() or _G
 end
 
-local WSConnect = 
-    (syn and syn.websocket.connect) or 
-    (Krnl and (function()
-        repeat task.wait() until Krnl.WebSocket and Krnl.WebSocket.connect
-        return Krnl.WebSocket.connect
-    end)()) or 
-    (WebSocket and WebSocket.connect) or 
-    (function() error("WebSocket connection not supported in this environment.") end)()
+local robloxclient = getfenv().version and getfenv().version() or "Unknown"
+local NotConnectMore = false
+local isServerDisconnect = false
+local triedLocalhost = false
+local WebSocketInstance = nil
 
-if not WSConnect then
-    error("WebSocket connection not supported in this environment.")
+local WSConnect =
+	(syn and syn.websocket.connect) or
+	(Krnl and (function()
+		repeat task.wait() until Krnl.WebSocket and Krnl.WebSocket.connect
+		return Krnl.WebSocket.connect
+	end)()) or
+	(WebSocket and WebSocket.connect) or
+	(function() error("WebSocket connection not supported in this environment.") end)()
+
+local function getUrlToTry()
+	if not triedLocalhost then
+		return "ws://localhost:10250"
+	else
+		return getGlobalTable().WebsocketURL
+	end
 end
 
-local WebSocketInstance = nil
-local URL = getGlobalTable().WebsocketURL
-local retrying = false
+local function startReconnect()
+	if NotConnectMore or isServerDisconnect then return end
+	task.delay(5, function()
+		connectWebSocket()
+	end)
+end
 
 function connectWebSocket()
+	if NotConnectMore then return end
+
+	local URL = getUrlToTry()
+
 	if WebSocketInstance then
 		WebSocketInstance:Close()
 		WebSocketInstance = nil
@@ -32,10 +49,10 @@ function connectWebSocket()
 	local success, socket = pcall(function()
 		return WSConnect(URL)
 	end)
+
 	if success and socket then
 		WebSocketInstance = socket
-		retrying = false
-		print("🐱 Success connect roblox client to VSC")
+		print("✅ Connected to " .. URL)
 
 		WebSocketInstance.OnMessage:Connect(function(msg)
 			local ok, data = pcall(function()
@@ -50,20 +67,28 @@ function connectWebSocket()
 				if not runOk then
 					warn("[ROBLOX EXECUTE ERROR]", err)
 				end
+
 			elseif data.type == "disconnect" then
 				print("🛑 Disconnected by server.")
+				isServerDisconnect = true
+				NotConnectMore = true
 				WebSocketInstance:Close()
 				WebSocketInstance = nil
 			end
 		end)
 
 		WebSocketInstance.OnClose:Connect(function()
-			print("💀 WebSocket closed. Reconnecting in 5s...")
-			WebSocketInstance = nil
-			startReconnect()
+			if not isServerDisconnect then
+				print("💀 WebSocket closed. Reconnecting in 5s...")
+				WebSocketInstance = nil
+				if not triedLocalhost then
+					triedLocalhost = true
+				end
+				startReconnect()
+			end
 		end)
 
-		-- Gửi dữ liệu đăng ký
+		-- Send client info
 		WebSocketInstance:Send(HttpService:JSONEncode({
 			type = "register",
 			clientData = {
@@ -73,11 +98,11 @@ function connectWebSocket()
 					UserId = Players.LocalPlayer.UserId
 				},
 				ExploitName = identifyexecutor and identifyexecutor() or "Unknown",
-				RobloxClient = version and version() or "Unknown"
+				RobloxClient = robloxclient
 			}
 		}))
 
-		-- Báo lỗi khi có script lỗi
+		-- Script error reporting
 		ScriptContext.ErrorDetailed:Connect(function(message, stackTrace, script, details, securityLevel)
 			if WebSocketInstance then
 				WebSocketInstance:Send(HttpService:JSONEncode({
@@ -92,18 +117,13 @@ function connectWebSocket()
 			end
 		end)
 	else
-		print("🛑 Failed to connect WebSocket. Retrying in 5s...")
-		WebSocketInstance = nil
-		retrying = false
+		print("🛑 Failed to connect to " .. URL)
+		if not triedLocalhost then
+			triedLocalhost = true
+		end
 		startReconnect()
 	end
 end
 
-function startReconnect()
-	if retrying then return end
-	retrying = true
-	task.delay(5, connectWebSocket)
-end
-
--- Start connect
+-- Start connection
 connectWebSocket()
