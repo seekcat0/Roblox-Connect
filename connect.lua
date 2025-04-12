@@ -23,7 +23,7 @@ local WSConnect =
 
 local function getUrlToTry()
 	if not triedLocalhost then
-		return "ws://localhost:10250"
+		return "ws://localhost:10250/"
 	else
 		return getGlobalTable().WebsocketURL
 	end
