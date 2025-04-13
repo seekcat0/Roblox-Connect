@@ -61,9 +61,9 @@ function connectWebSocket()
 			end)
 			if not ok or not data then return end
 
-			if data.type == "Run" and data.Lua then
+			if data.type == "run_lua" and data.body then
 				local runOk, err = pcall(function()
-					loadstring(data.Lua)()
+					loadstring(data.body)()
 				end)
 				if not runOk then
 					warn("[ROBLOX EXECUTE ERROR]", err)
