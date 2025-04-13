@@ -52,7 +52,8 @@ function connectWebSocket()
 
 	if success and socket then
 		WebSocketInstance = socket
-		print("✅ Connected to " .. URL)
+
+		print("🔷 WebSocket Connected: " .. URL)
 
 		WebSocketInstance.OnMessage:Connect(function(msg)
 			local ok, data = pcall(function()
@@ -88,21 +89,17 @@ function connectWebSocket()
 			end
 		end)
 
-		-- Send client info
+		-- Gửi info client nhanh gọn
 		WebSocketInstance:Send(HttpService:JSONEncode({
 			type = "register",
 			clientData = {
-				LocalPlayer = {
-					Name = Players.LocalPlayer.Name,
-					DisplayName = Players.LocalPlayer.DisplayName,
-					UserId = Players.LocalPlayer.UserId
-				},
+				LocalPlayer = HttpService:JSONEncode(Players.LocalPlayer),
 				ExploitName = identifyexecutor and identifyexecutor() or "Unknown",
 				RobloxClient = robloxclient
 			}
 		}))
 
-		-- Script error reporting
+		-- Báo lỗi chi tiết nếu có
 		ScriptContext.ErrorDetailed:Connect(function(message, stackTrace, script, details, securityLevel)
 			if WebSocketInstance then
 				WebSocketInstance:Send(HttpService:JSONEncode({
