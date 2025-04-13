@@ -89,17 +89,19 @@ function connectWebSocket()
 			end
 		end)
 
-		-- Gửi info client nhanh gọn
 		WebSocketInstance:Send(HttpService:JSONEncode({
 			type = "register",
 			clientData = {
-				LocalPlayer = HttpService:JSONEncode(Players.LocalPlayer),
+				LocalPlayer = {
+					Name = game.Players.LocalPlayer.Name,
+					DisplayName = game.Players.LocalPlayer.DisplayName,
+					UserId = game.Players.LocalPlayer.UserId
+				},
 				ExploitName = identifyexecutor and identifyexecutor() or "Unknown",
-				RobloxClient = robloxclient
+				RobloxClient = version and version() or "Unknown"
 			}
 		}))
 
-		-- Báo lỗi chi tiết nếu có
 		ScriptContext.ErrorDetailed:Connect(function(message, stackTrace, script, details, securityLevel)
 			if WebSocketInstance then
 				WebSocketInstance:Send(HttpService:JSONEncode({
