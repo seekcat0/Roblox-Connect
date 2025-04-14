@@ -12,6 +12,12 @@ local isServerDisconnect = false
 local triedLocalhost = false
 local WebSocketInstance = nil
 
+-- Logging tiện lợi
+local function logInfo(msg) print("🔷 [Info] " .. msg) end
+local function logSuccess(msg) print("🟢 [Success] " .. msg) end
+local function logWarn(msg) warn("🟡 [Warning] " .. msg) end
+local function logError(msg) warn("🔴 [Error] " .. msg) end
+
 local WSConnect =
 	(syn and syn.websocket.connect) or
 	(Krnl and (function()
@@ -28,7 +34,7 @@ local function getUrlToTry()
 		local global = getGlobalTable()
 		local url = global.WebsocketURL
 		if type(url) ~= "string" or not (url:lower():sub(1, 5) == "ws://" or url:lower():sub(1, 6) == "wss://") then
-			print("❌ No WebSocket Providers")
+			logError("No valid WebSocket Providers found.")
 			return nil
 		end
 		return url
@@ -38,6 +44,7 @@ end
 local function startReconnect()
 	if NotConnectMore or isServerDisconnect then return end
 	task.delay(5, function()
+		logWarn("Trying to reconnect WebSocket...")
 		connectWebSocket()
 	end)
 end
@@ -46,6 +53,7 @@ function connectWebSocket()
 	if NotConnectMore then return end
 
 	local URL = getUrlToTry()
+	if not URL then return end
 
 	if WebSocketInstance then
 		WebSocketInstance:Close()
@@ -58,8 +66,7 @@ function connectWebSocket()
 
 	if success and socket then
 		WebSocketInstance = socket
-
-		print("🔷 WebSocket Connected: " .. URL)
+		logSuccess("Connected to: " .. URL)
 
 		WebSocketInstance.OnMessage:Connect(function(msg)
 			local ok, data = pcall(function()
@@ -72,11 +79,11 @@ function connectWebSocket()
 					loadstring(data.body)()
 				end)
 				if not runOk then
-					warn("[ROBLOX EXECUTE ERROR]", err)
+					logError("Execution error: " .. tostring(err))
 				end
 
 			elseif data.type == "disconnect" then
-				print("🛑 Disconnected by server.")
+				logWarn("Disconnected by server.")
 				isServerDisconnect = true
 				NotConnectMore = true
 				WebSocketInstance:Close()
@@ -86,7 +93,7 @@ function connectWebSocket()
 
 		WebSocketInstance.OnClose:Connect(function()
 			if not isServerDisconnect then
-				print("💀 WebSocket closed. Reconnecting in 5s...")
+				logWarn("WebSocket closed unexpectedly. Reconnecting in 5s...")
 				WebSocketInstance = nil
 				if not triedLocalhost then
 					triedLocalhost = true
@@ -99,12 +106,12 @@ function connectWebSocket()
 			type = "register",
 			clientData = {
 				LocalPlayer = {
-					Name = game.Players.LocalPlayer.Name,
-					DisplayName = game.Players.LocalPlayer.DisplayName,
-					UserId = game.Players.LocalPlayer.UserId
+					Name = Players.LocalPlayer.Name,
+					DisplayName = Players.LocalPlayer.DisplayName,
+					UserId = Players.LocalPlayer.UserId
 				},
 				ExploitName = identifyexecutor and identifyexecutor() or "Unknown",
-				RobloxClient = version and version() or "Unknown"
+				RobloxClient = robloxclient
 			}
 		}))
 
@@ -122,7 +129,7 @@ function connectWebSocket()
 			end
 		end)
 	else
-		print("🛑 Failed to connect to " .. URL)
+		logError("Failed to connect to: " .. tostring(URL))
 		if not triedLocalhost then
 			triedLocalhost = true
 		end
@@ -130,5 +137,6 @@ function connectWebSocket()
 	end
 end
 
--- Start connection
+-- 🚀 Khởi động
+logInfo("🔌 Starting WebSocket connection...")
 connectWebSocket()
