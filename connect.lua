@@ -25,7 +25,13 @@ local function getUrlToTry()
 	if not triedLocalhost then
 		return "ws://localhost:10250/"
 	else
-		return getGlobalTable().WebsocketURL
+		local global = getGlobalTable()
+		local url = global.WebsocketURL
+		if type(url) ~= "string" or not (url:lower():sub(1, 5) == "ws://" or url:lower():sub(1, 6) == "wss://") then
+			print("❌ No WebSocket Providers")
+			return nil
+		end
+		return url
 	end
 end
 
